@@ -1,6 +1,8 @@
 import React from 'react';
 import Reactium, { useHookComponent } from 'reactium-core/sdk';
 
+import SDK from './sdk';
+
 const noop = () => {};
 
 /**
@@ -16,7 +18,7 @@ export default ({
     onDelete = noop,
     onItemSelect = noop,
 }) => {
-    const key = Reactium.Shortcode.parseKey(code);
+    const key = SDK.parseKey(code);
     const { Button, Dropdown, Icon } = useHookComponent('ReactiumUI');
 
     return (

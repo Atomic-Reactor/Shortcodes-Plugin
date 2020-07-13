@@ -72,4 +72,6 @@ SDK.save = async (newShortcodes = {}) => {
     return _shortcodes;
 };
 
+Reactium.Shortcode = SDK;
+
 export default SDK;

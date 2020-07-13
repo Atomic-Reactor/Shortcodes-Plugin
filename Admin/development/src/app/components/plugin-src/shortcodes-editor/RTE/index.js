@@ -3,6 +3,8 @@ import Panel from './Panel';
 import op from 'object-path';
 import Reactium, { useHookComponent } from 'reactium-core/sdk';
 
+import SDK from '../sdk';
+
 const SidebarButton = props => {
     const { Button, Icon } = useHookComponent('ReactiumUI');
     return (
@@ -17,7 +19,7 @@ const SidebarButton = props => {
 };
 
 const FormatElement = ({ shortcode, ...props }) => {
-    const type = Reactium.Shortcode.Component.get(shortcode.type);
+    const type = SDK.Component.get(shortcode.type);
 
     let EditorComponent;
 
@@ -50,7 +52,7 @@ Plugin.callback = editor => {
 
         editor.panel
             .setID(Plugin.type)
-            .setContent(<Panel selection={editor.selection} />)
+            .setContent(<Panel selection={editor.selection} editor={editor} />)
             .moveTo(x, y)
             .show();
     };

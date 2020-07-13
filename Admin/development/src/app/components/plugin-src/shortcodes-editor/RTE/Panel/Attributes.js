@@ -1,14 +1,16 @@
 import React from 'react';
 import op from 'object-path';
 import camelcase from 'camelcase';
-import Reactium, { useHookComponent } from 'reactium-core/sdk';
+import { useHookComponent } from 'reactium-core/sdk';
+
+import SDK from '../../sdk';
 
 export default props => {
     const { Modal, insert, shortcode } = props;
 
     const { Dialog, Button, EventForm } = useHookComponent('ReactiumUI');
 
-    const type = Reactium.Shortcode.Component.get(shortcode.type);
+    const type = SDK.Component.get(shortcode.type);
 
     const typeLabel = [
         shortcode.code,

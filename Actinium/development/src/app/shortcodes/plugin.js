@@ -1,5 +1,7 @@
+
+console.log('Shortcodes', '0.0.12');
+
 const path = require('path');
-const _ = require('underscore');
 
 const PLUGIN = {
     ID: 'Shortcodes',
@@ -12,6 +14,7 @@ const PLUGIN = {
     },
     bundle: [],
     meta: {
+        admin: true,
         settings: false,
         builtIn: false,
         group: 'utilities',
@@ -30,13 +33,6 @@ Actinium.Plugin.register(PLUGIN, false);
  * Asset registration
  * ----------------------------------------------------------------------------
  */
-
-Actinium.Plugin.addScript(
-    PLUGIN.ID,
-    path.resolve(__dirname, 'plugin-assets/shortcodes-sdk.js'),
-    true,
-);
-
 Actinium.Plugin.addScript(
     PLUGIN.ID,
     path.resolve(__dirname, 'plugin-assets/shortcodes-editor.js'),
@@ -65,14 +61,26 @@ Actinium.Capability.register('shortcodes.delete', {}, 1000);
  * ----------------------------------------------------------------------------
  */
 
-// Blueprints
-Actinium.Hook.register('blueprint-list', blueprints => {
+// Start: Blueprints
+Actinium.Hook.register('start', () => {
     if (!Actinium.Plugin.isActive(PLUGIN.ID)) return;
     const PLUGIN_BLUEPRINTS = require('./blueprints');
-    PLUGIN_BLUEPRINTS.forEach(item => {
-        if(!_.findWhere(blueprints, { ID: item.ID })) blueprints.push(item);
-    });
-}, -1000);
+    PLUGIN_BLUEPRINTS.forEach(blueprint => Actinium.Blueprint.register(blueprint.ID, blueprint));
+});
+
+// Activate: Blueprints
+Actinium.Hook.register('activate', ({ ID }) => {
+    if (ID !== PLUGIN.ID) return;
+    const PLUGIN_BLUEPRINTS = require('./blueprints');
+    PLUGIN_BLUEPRINTS.forEach(blueprint => Actinium.Blueprint.register(blueprint.ID, blueprint));
+});
+
+// Deactivate: Blueprints
+Actinium.Hook.register('dectivate', ({ ID }) => {
+    if (ID !== PLUGIN.ID) return;
+    const PLUGIN_BLUEPRINTS = require('./blueprints');
+    PLUGIN_BLUEPRINTS.forEach(blueprint => Actinium.Blueprint.unregister(blueprint.ID));
+});
 
 // Routes
 Actinium.Hook.register(

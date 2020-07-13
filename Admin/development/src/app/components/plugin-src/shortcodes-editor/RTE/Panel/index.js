@@ -8,11 +8,14 @@ import Attributes from './Attributes';
 import { ReactEditor, useEditor } from 'slate-react';
 import { Scrollbars } from 'react-custom-scrollbars';
 
+import SDK from '../../sdk';
+
 import Reactium, {
     useAsyncEffect,
     useDerivedState,
     useHandle,
     useHookComponent,
+    useStatus,
 } from 'reactium-core/sdk';
 
 const ENUMS = {
@@ -30,19 +33,18 @@ const noop = () => {};
  * Hook Component: Panel
  * -----------------------------------------------------------------------------
  */
-let Panel = ({ namespace, title, ...props }) => {
+let Panel = ({ editor, namespace, title, ...props }) => {
     // -------------------------------------------------------------------------
     // Refs
     // -------------------------------------------------------------------------
-    const status = useRef(ENUMS.STATUS.PENDING);
+
     const containerRef = useRef();
 
     // Components
     const { Dialog, Spinner } = useHookComponent('ReactiumUI');
     const tools = useHandle('AdminTools');
 
-    // editor ref
-    const editor = useEditor();
+    const [status, setStatus, isStatus] = useStatus(ENUMS.STATUS.PENDING);
 
     // -------------------------------------------------------------------------
     // State
@@ -59,11 +61,6 @@ let Panel = ({ namespace, title, ...props }) => {
         update(newState);
     };
 
-    const setStatus = newStatus => {
-        if (unMounted()) return;
-        status.current = newStatus;
-    };
-
     // -------------------------------------------------------------------------
     // Internal Interface
     // -------------------------------------------------------------------------
@@ -74,7 +71,7 @@ let Panel = ({ namespace, title, ...props }) => {
 
     const hide = () => {
         editor.panel.hide(false, true).setID('rte-panel');
-        ReactEditor.focus(editor);
+        //ReactEditor.focus(editor);
     };
 
     const insertNode = shortcode => {
@@ -90,18 +87,18 @@ let Panel = ({ namespace, title, ...props }) => {
     };
 
     // initialize();
-    const initialize = async mounted => {
-        if (status.current !== ENUMS.STATUS.PENDING) return;
-        setStatus(ENUMS.STATUS.INITIALIZING);
+    const initialize = async () => {
+        if (!isStatus(ENUMS.STATUS.PENDING)) return;
+        setStatus(ENUMS.STATUS.INITIALIZING, true);
 
-        let shortcodes = Reactium.Shortcode.list();
+        let shortcodes = SDK.list();
         if (!shortcodes || Object.keys(shortcodes).length < 1) {
-            shortcodes = await Reactium.Shortcode.list(true);
+            shortcodes = await SDK.list(true);
         }
 
-        if (!mounted()) return;
-        setState({ shortcodes });
+        if (unMounted()) return;
         setStatus(ENUMS.STATUS.READY);
+        setState({ shortcodes });
     };
 
     const _search = value => {
@@ -140,7 +137,7 @@ let Panel = ({ namespace, title, ...props }) => {
 
     // handlers
     const onSelect = shortcode => {
-        const type = Reactium.Shortcode.Component.get(shortcode.type);
+        const type = SDK.Component.get(shortcode.type);
 
         if (!op.get(type, 'attributes')) {
             insert(shortcode);
@@ -159,7 +156,7 @@ let Panel = ({ namespace, title, ...props }) => {
     // -------------------------------------------------------------------------
     // Side effects
     // -------------------------------------------------------------------------
-    useAsyncEffect(initialize, [status.current]);
+    useAsyncEffect(initialize, [status]);
 
     return (
         <Dialog
@@ -196,7 +193,7 @@ let Panel = ({ namespace, title, ...props }) => {
                             ))}
                         </ul>
                     </Scrollbars>
-                    {status.current !== ENUMS.STATUS.READY && (
+                    {!isStatus(ENUMS.STATUS.READY) && (
                         <div className={cx('spinner')}>
                             <Spinner />
                         </div>

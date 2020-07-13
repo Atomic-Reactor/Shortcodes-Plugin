@@ -1,14 +1,13 @@
-const PLUGIN_BLUEPRINTS = require('./blueprints');
 const PLUGIN_ROUTES = require('./routes');
+const PLUGIN_BLUEPRINTS = require('./blueprints');
+const registerBlueprints = (reg = true) => ({ ID }) => {
+    if (reg === true)
+        PLUGIN_BLUEPRINTS.forEach(bp => Actinium.Blueprint.register(bp.ID, bp));
+    else PLUGIN_BLUEPRINTS.forEach(bp => Actinium.Blueprint.unregister(bp.ID));
+};
 
-// Register Blueprints
-Actinium.Hook.register(
-    'blueprint-defaults',
-    blueprints => {
-        PLUGIN_BLUEPRINTS.forEach(item => blueprints.push(item));
-    },
-    -1000,
-);
+// Start: Blueprints
+Actinium.Hook.register('start', registerBlueprints(true));
 
 // Register Routes
 Actinium.Hook.register('route-defaults', routes => {

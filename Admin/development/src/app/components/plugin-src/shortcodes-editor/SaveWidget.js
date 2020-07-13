@@ -1,19 +1,12 @@
+import React from 'react';
 import op from 'object-path';
-import React, { useEffect, useState } from 'react';
-import {
-    __,
-    useFulfilledObject,
-    useHandle,
-    useHookComponent,
-    useSelect,
-} from 'reactium-core/sdk';
+import { __, useHandle, useHookComponent, useSelect } from 'reactium-core/sdk';
 
 export default () => {
     const Shortcodes = useHandle('Shortcodes');
     const { Button, Icon } = useHookComponent('ReactiumUI');
     const path = useSelect(state => op.get(state, 'Router.match.path'));
     const visible = String(path).startsWith('/admin/shortcodes');
-    const [ready] = useFulfilledObject(Shortcodes, ['status']);
 
     const onClick = () => Shortcodes.save();
 

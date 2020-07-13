@@ -2,7 +2,7 @@ import React from 'react';
 import op from 'object-path';
 import { __, useHookComponent } from 'reactium-core/sdk';
 
-const isActive = (match = {}, location) =>
+const isActive = (match = {}) =>
     String(op.get(match, 'url', '/'))
         .replace(/\\/gi, '')
         .toLowerCase()

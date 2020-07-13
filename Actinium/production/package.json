@@ -11,7 +11,7 @@
     "docs": "arcli docs -s .core,src/app,node_modules/@atomic-reactor -d docs"
   },
   "dependencies": {
-    "@atomic-reactor/actinium-auth": "^1.0.4",
+    "@atomic-reactor/actinium-auth": "^1.0.5",
     "@atomic-reactor/shortcodes-editor": "file:actinium_modules/@atomic-reactor/shortcodes-editor/_npm",
     "action-sequence": "^1.1.1",
     "apidoc": "^0.17.7",

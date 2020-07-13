@@ -5,11 +5,11 @@ import SaveWidget from './SaveWidget';
 import Breadcrumbs from './Breadcrumbs';
 import SidebarWidget from './SidebarWidget';
 import Reactium, { __ } from 'reactium-core/sdk';
+import SDK from './sdk';
+
+console.log('Shortcodes ver 0.0.14');
 
 Reactium.Plugin.register('shortcodes', 1).then(() => {
-    // Only use this plugin if the Shortcode SDK is loaded.
-    if (!Reactium.Shortcode) return;
-
     // RTE Plugin
     Reactium.RTE.Plugin.register('shortcode', ShortcodeRTE);
 
@@ -23,7 +23,7 @@ Reactium.Plugin.register('shortcodes', 1).then(() => {
         </span>
     ));
 
-    Reactium.Shortcode.Component.register('ShortcodeText', {
+    SDK.Component.register('ShortcodeText', {
         component: 'ShortcodeText', // ID of a registered component. Used in the front end when this shortcode is replaced.
         editorComponent: 'ShortcodeTextEditor', // ID of a registered component. Used in the RTE when this shortcode is selected.
         label: 'Text', // String|Node used in the dropdown.
@@ -32,7 +32,7 @@ Reactium.Plugin.register('shortcodes', 1).then(() => {
         validate: undefined, // Validation function See EventForm validate property
     });
 
-    Reactium.Shortcode.Component.register('ShortcodeTest', {
+    SDK.Component.register('ShortcodeTest', {
         component: 'ShortcodeTest',
         label: 'Test',
         attributes: {

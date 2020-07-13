@@ -5,6 +5,8 @@ import PropTypes from 'prop-types';
 import ShortcodeListItem from './ShortcodeListItem';
 import { Scrollbars } from 'react-custom-scrollbars';
 
+import SDK from './sdk';
+
 import Reactium, {
     __,
     useAsyncEffect,
@@ -69,8 +71,8 @@ let Shortcodes = ({
     // State
     // -------------------------------------------------------------------------
     const [state, update] = useDerivedState({
-        shortcodes: Reactium.Shortcode.list(),
-        type: Reactium.Shortcode.Component.list[0],
+        shortcodes: SDK.list(),
+        type: SDK.Component.list[0],
     });
 
     const setState = newState => {
@@ -88,14 +90,14 @@ let Shortcodes = ({
 
     const deleteCode = code => {
         // Optimistically update the state
-        const key = Reactium.Shortcode.parseKey(code);
+        const key = SDK.parseKey(code);
 
         let shortcodes = { ...op.get(state, 'shortcodes') };
         op.del(shortcodes, key);
         setState({ shortcodes });
 
         // Do async delete
-        return Reactium.Shortcode.delete(code);
+        return SDK.delete(code);
     };
 
     // dispatch(eventType:String, event:Object, callback:Function);
@@ -123,7 +125,7 @@ let Shortcodes = ({
         setStatus(ENUMS.STATUS.INITIALIZING);
 
         // DO YOUR INITIALIZATION HERE
-        const shortcodes = await Reactium.Shortcode.list(true);
+        const shortcodes = await SDK.list(true);
 
         // SET STATUS TO INITIALIZED WHEN COMPLETE
         _.delay(() => {
@@ -151,7 +153,7 @@ let Shortcodes = ({
 
         const shortcodes = formRef.current.getValue();
 
-        await Reactium.Shortcode.save(shortcodes);
+        await SDK.save(shortcodes);
         setStatus(ENUMS.STATUS.READY);
     };
 
@@ -160,10 +162,10 @@ let Shortcodes = ({
         save();
     };
 
-    const type = id => Reactium.Shortcode.Component.get(id);
+    const type = id => SDK.Component.get(id);
 
     const onCodeBlur = e => {
-        e.target.value = Reactium.Shortcode.parseCode(e.target.value, true);
+        e.target.value = SDK.parseCode(e.target.value, true);
     };
 
     const onCodeDelete = e => {
@@ -194,12 +196,12 @@ let Shortcodes = ({
     };
 
     const onCodeKeyDown = e => {
-        if (!Reactium.Shortcode.isKey(e)) return;
+        if (!SDK.isKey(e)) return;
 
         e.preventDefault();
         e.stopPropagation();
         const value = e.which === 189 ? '-' : String.fromCharCode(e.which);
-        e.target.value = Reactium.Shortcode.parseCode(e.target.value + value);
+        e.target.value = SDK.parseCode(e.target.value + value);
         const cursor = e.target.value.length - 1;
         e.target.setSelectionRange(cursor, cursor);
         return;
@@ -208,7 +210,7 @@ let Shortcodes = ({
     const onCodeSubmit = e => {
         const { code, replacer } = e.value;
         const { shortcodes = {}, type } = state;
-        const key = Reactium.Shortcode.parseKey(code);
+        const key = SDK.parseKey(code);
 
         if (!code || !key || !replacer) return;
         const inputShortcode = document.getElementById('shortcode-code');
@@ -220,10 +222,10 @@ let Shortcodes = ({
                 message: __(error.message),
                 type: Toast.TYPE.ERROR,
             });
-
+            if (inputShortcode) {
+                inputShortcode.focus();
+            }
             setState({ error });
-            inputShortcode.focus();
-
             return;
         }
 
@@ -232,12 +234,14 @@ let Shortcodes = ({
             [key]: { code, replacer, key, type: type.id },
         };
 
-        // Optimistically update state
-        setState({ error: null, shortcodes: newCodes });
-
         // Cleanup UI
         inputRef.current.setValue(null);
-        inputShortcode.focus();
+        if (inputShortcode) {
+            inputShortcode.focus();
+        }
+
+        // Optimistically update state
+        setState({ error: null, shortcodes: newCodes });
 
         // Do async save
         save();
@@ -335,7 +339,7 @@ let Shortcodes = ({
                         type='text'
                     />
                     <Dropdown
-                        data={Reactium.Shortcode.Component.list}
+                        data={SDK.Component.list}
                         onItemSelect={({ item }) => setState({ type: item })}
                         valueField='id'
                         selection={[state.type.id]}>
@@ -380,7 +384,7 @@ let Shortcodes = ({
                                 <ShortcodeListItem
                                     key={`code${key}`}
                                     code={value.code}
-                                    data={Reactium.Shortcode.Component.list}
+                                    data={SDK.Component.list}
                                     replacer={value.replacer}
                                     type={type(value.type || 'ShortcodeText')}
                                     onBlur={onCodeBlur}
