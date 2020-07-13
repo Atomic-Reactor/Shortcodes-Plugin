@@ -1,0 +1,5 @@
+{
+    "ignore": ["./docs/*", "src/env.dev.json"],
+    "quiet": true,
+    "watch": ["./src", "./.core"]
+}

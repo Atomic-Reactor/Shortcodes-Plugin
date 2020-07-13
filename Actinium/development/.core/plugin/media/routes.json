@@ -1,0 +1,26 @@
+[
+    {
+        "route": "/admin/media/edit/:id",
+        "blueprint": "Media-Editor",
+        "meta": {
+            "builtIn": true
+        },
+        "capabilities": ["Media.update"]
+    },
+    {
+        "route": "/admin/media/:page",
+        "blueprint": "Media",
+        "meta": {
+            "builtIn": true
+        },
+        "capabilities": ["Media.retrieve"]
+    },
+    {
+        "route": "/admin/media",
+        "blueprint": "Media",
+        "meta": {
+            "builtIn": true
+        },
+        "capabilities": ["Media.retrieve"]
+    }
+]
