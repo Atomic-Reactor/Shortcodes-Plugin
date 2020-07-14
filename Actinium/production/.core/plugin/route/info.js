@@ -1,7 +1,7 @@
 module.exports = {
-    ID: 'Taxonomy',
-    description: '',
-    name: 'Taxonomy Plugin',
+    ID: 'Route',
+    description: 'Plugin responsible for managing front-end dynamic routing.',
+    name: 'Route Plugin',
     order: 100,
     version: {
         actinium: '>=3.2.6',
@@ -9,7 +9,6 @@ module.exports = {
     },
     bundle: [],
     meta: {
-        group: 'Editing',
         builtIn: true,
     },
 };

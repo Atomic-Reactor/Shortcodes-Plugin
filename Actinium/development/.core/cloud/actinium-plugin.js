@@ -4,8 +4,9 @@ const {
     CloudCapOptions,
     CloudRunOptions,
 } = require(`${ACTINIUM_DIR}/lib/utils`);
-
+const semver = require('semver');
 const COLLECTION = 'Plugin';
+const path = require('path');
 
 const toggle = req => {
     const { plugin: ID, active = false } = req.params;
@@ -147,7 +148,6 @@ Parse.Cloud.beforeSave(COLLECTION, async req => {
         'name',
         'order',
         'version',
-        'bundle',
         'meta',
     ];
 
@@ -173,8 +173,15 @@ Parse.Cloud.beforeSave(COLLECTION, async req => {
 
         const { active: prev, version: prevVer } = old;
 
-        if (active === true && version !== prevVer) {
-            await Actinium.Hook.run('update', obj, old, req);
+        if (active === true) {
+            if (semver.gt(semver.coerce(version), semver.coerce(prevVer))) {
+                await Actinium.Hook.run('update', obj, req, old);
+            }
+            if (semver.lt(semver.coerce(version), semver.coerce(prevVer))) {
+                WARN(
+                    `Plugin ${obj.ID} new version ${version} is less than previous version ${prevVer}!`,
+                );
+            }
         }
 
         if (active === true && active !== prev) {
@@ -209,6 +216,19 @@ Parse.Cloud.afterDelete(COLLECTION, async req => {
 Parse.Cloud.afterSave(COLLECTION, async req => {
     await Actinium.Hook.run('afterSave', req);
 });
+
+Actinium.Hook.register(
+    'add-meta-asset',
+    async metaAsset => {
+        const parsedFilename = path.parse(metaAsset.targetFileName);
+        const plugin = Actinium.Cache.get(`plugins.${metaAsset.ID}`);
+        const appVer = op.get(ACTINIUM_CONFIG, 'version');
+        const version = op.get(plugin, 'version', appVer);
+        const { name, ext } = parsedFilename;
+        metaAsset.targetFileName = `${name}-${version}${ext}`;
+    },
+    Actinium.Enums.priority.highest,
+);
 
 /**
  * @api {Cloud} plugin-activate plugin-activate
