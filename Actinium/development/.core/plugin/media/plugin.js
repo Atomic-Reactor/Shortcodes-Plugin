@@ -26,7 +26,9 @@ Actinium.Hook.register('schema', async ({ ID }) => {
     if (ID !== PLUGIN.ID) return;
 
     Object.keys(PLUGIN_SCHEMA.ACTIONS.MEDIA).forEach(action =>
-        Actinium.Capability.register(`${COLLECTION.MEDIA}.${action}`),
+        Actinium.Capability.register(`${COLLECTION.MEDIA}.${action}`, {
+            allowed: ['contributor', 'moderator'],
+        }),
     );
 
     Actinium.Collection.register(
@@ -52,6 +54,25 @@ const registerBlueprints = (reg = true) => ({ ID }) => {
 
 // Start: Blueprints
 Actinium.Hook.register('start', registerBlueprints(true));
+
+// Capabilities
+Actinium.Hook.register('before-capability-load', () => {
+    if (!Actinium.Plugin.isActive(PLUGIN.ID)) return;
+
+    const caps = [
+        'media-ui.view',
+        'media.addfield',
+        'media.create',
+        'media.update',
+        'media.update',
+        'media.retrieve',
+    ];
+    caps.forEach(cap =>
+        Actinium.Capability.register(cap, {
+            allowed: ['contributor', 'moderator'],
+        }),
+    );
+});
 
 // Activate: Blueprints
 Actinium.Hook.register('activate', registerBlueprints(true));
@@ -261,12 +282,9 @@ Actinium.Cloud.run('directories').then(directories => {
 });
  */
 Actinium.Cloud.define(PLUGIN.ID, 'directories', async req => {
-    const cap = await Actinium.Setting.get('media.capabilities.list', [
-        'Media.retrieve',
-    ]);
-
-    if (!CloudHasCapabilities(req, cap))
+    if (!CloudHasCapabilities(req, 'media-ui.view')) {
         return Promise.reject(ENUMS.ERRORS.PERMISSION);
+    }
 
     const { user } = req;
     const { search, verbose } = req.params;
@@ -389,16 +407,9 @@ Actinium.Cloud.run('media', { page: 1, limit: 20 directory: 'avatars', search: '
     prev: Number
 }
  */
-Actinium.Cloud.define(PLUGIN.ID, 'media', async req => {
-    const cap = await Actinium.Setting.get('media.capabilities.retrieve', [
-        'Media.retrieve',
-    ]);
-
-    if (!CloudHasCapabilities(req, cap))
-        return Promise.reject(ENUMS.ERRORS.PERMISSION);
-
-    return Actinium.Media.files({ ...req.params, user: req.user });
-});
+Actinium.Cloud.define(PLUGIN.ID, 'media', async req =>
+    Actinium.Media.files({ ...req.params, user: req.user }),
+);
 
 /**
  * @api {Cloud} media-delete media-delete

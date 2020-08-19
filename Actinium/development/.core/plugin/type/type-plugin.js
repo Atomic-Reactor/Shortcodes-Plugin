@@ -117,7 +117,9 @@ Actinium.Capability.register(
 );
 Actinium.Capability.register(
     `${COLLECTION}.retrieve`,
-    {},
+    {
+        allowed: ['anonymous', 'contributor', 'moderator', 'user'],
+    },
     Actinium.Enums.priority.highest,
 );
 Actinium.Capability.register(
@@ -136,11 +138,17 @@ Actinium.Capability.register(
     Actinium.Enums.priority.highest,
 );
 
+Actinium.Capability.register(
+    'type-ui.view',
+    {},
+    Actinium.Enums.priority.highest,
+);
+
 Actinium.Collection.register(
     COLLECTION,
     {
         create: false,
-        retrieve: false,
+        retrieve: true,
         update: false,
         delete: false,
         addField: false,

@@ -1,6 +1,6 @@
 const chalk = require('chalk');
 const op = require('object-path');
-
+const _ = require('underscore');
 const PLUGIN = require('./info');
 const COLLECTION = PLUGIN.ID;
 
@@ -30,6 +30,10 @@ const saveRoutes = async () => {
         await Actinium.Route.save(route);
     }
 };
+
+Actinium.Capability.register('admin-ui.view', {
+    allowed: ['contributor', 'moderator', 'user'],
+});
 
 // Update routes on startup
 Actinium.Hook.register('start', async () => {
@@ -66,17 +70,16 @@ Actinium.Hook.register('schema', async ({ ID }) => {
 
     const PLUGIN_SCHEMA = require('./schema');
     PLUGIN_SCHEMA.forEach(item => {
-        const { actions = {}, collection, schema = {} } = item;
+        const { actions = {}, collection, schema = {}, indexes } = item;
         if (!collection) return;
 
-        Actinium.Collection.register(collection, actions, schema);
+        Actinium.Collection.register(collection, actions, schema, indexes);
     });
 
     Actinium.Capability.register(
         `${COLLECTION}.create`,
         {
-            allowed: ['contributor', 'administrator', 'super-admin'],
-            excluded: ['banned'],
+            allowed: ['moderator', 'contributor'],
         },
         1000,
     );
@@ -84,8 +87,7 @@ Actinium.Hook.register('schema', async ({ ID }) => {
     Actinium.Capability.register(
         `${COLLECTION}.retrieve`,
         {
-            allowed: ['contributor', 'administrator', 'super-admin'],
-            excluded: ['banned'],
+            allowed: ['moderator', 'contributor'],
         },
         1000,
     );
@@ -93,8 +95,7 @@ Actinium.Hook.register('schema', async ({ ID }) => {
     Actinium.Capability.register(
         `${COLLECTION}.update`,
         {
-            allowed: ['contributor', 'administrator', 'super-admin'],
-            excluded: ['banned'],
+            allowed: ['moderator', 'contributor'],
         },
         1000,
     );
@@ -102,20 +103,12 @@ Actinium.Hook.register('schema', async ({ ID }) => {
     Actinium.Capability.register(
         `${COLLECTION}.delete`,
         {
-            allowed: ['contributor', 'administrator', 'super-admin'],
-            excluded: ['banned'],
+            allowed: ['moderator', 'contributor'],
         },
         1000,
     );
 
-    Actinium.Capability.register(
-        `${COLLECTION}.addField`,
-        {
-            allowed: ['administrator', 'super-admin'],
-            excluded: ['banned'],
-        },
-        1000,
-    );
+    Actinium.Capability.register(`${COLLECTION}.addField`, {}, 1000);
 });
 
 /**
@@ -161,6 +154,23 @@ Actinium.Hook.register('route-delete', async req => {
     }
 });
 
+// if possible, add permission to these results
+Actinium.Hook.register('route-list-output', async (...params) => {
+    const [{ routes = [] }, , , , , , req] = params;
+
+    routes.forEach(route => {
+        const capabilities = route.get('capabilities');
+        if (!Array.isArray(capabilities) || capabilities.length < 1)
+            route.set('permitted', true);
+        else if (req) {
+            route.set(
+                'permitted',
+                Actinium.Utils.CloudHasCapabilities(req, capabilities, false),
+            );
+        }
+    });
+});
+
 /**
  * ----------------------------------------------------------------------------
  * Cloud Hooks
@@ -184,6 +194,8 @@ Actinium.Hook.register('route-delete', async req => {
         await Actinium.Hook.run(hook, req);
     });
 });
+
+// Actinium.Hook.register('route-list-query', async (qry, params, options, collection) => {});
 
 module.exports = PLUGIN;
 

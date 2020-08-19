@@ -7,8 +7,6 @@ import SidebarWidget from './SidebarWidget';
 import Reactium, { __ } from 'reactium-core/sdk';
 import SDK from './sdk';
 
-console.log('Shortcodes ver 0.0.14');
-
 Reactium.Plugin.register('shortcodes', 1).then(() => {
     // RTE Plugin
     Reactium.RTE.Plugin.register('shortcode', ShortcodeRTE);

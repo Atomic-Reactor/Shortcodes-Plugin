@@ -178,11 +178,11 @@ const meta = {
 
 const pref = {
     update: req => {
-        const options = CloudRunOptions(req);
+        const options = MasterOptions(req);
         return Actinium.User.Pref.update(req.params, options);
     },
     delete: req => {
-        const options = CloudRunOptions(req);
+        const options = MasterOptions(req);
         return Actinium.User.Pref.delete(req.params, options);
     },
 };
@@ -220,11 +220,9 @@ Actinium.Hook.register('start', async () => {
     }
 });
 
-// Update routes on plugin activation
-Actinium.Hook.register('activate', async ({ ID }) => {
-    if (ID === PLUGIN.ID) {
-        await saveRoutes();
-    }
+Actinium.Hook.register('before-capability-load', () => {
+    if (!Actinium.Plugin.isActive(PLUGIN.ID)) return;
+    Actinium.Capability.register('user-ui.view');
 });
 
 // Update routes on plugin update

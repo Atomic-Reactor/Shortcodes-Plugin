@@ -208,11 +208,11 @@ let Shortcodes = ({
     };
 
     const onCodeSubmit = e => {
-        const { code, replacer } = e.value;
+        const { code, replacer = '' } = e.value;
         const { shortcodes = {}, type } = state;
         const key = SDK.parseKey(code);
 
-        if (!code || !key || !replacer) return;
+        if (!code || !key) return;
         const inputShortcode = document.getElementById('shortcode-code');
 
         if (op.get(shortcodes, key)) {

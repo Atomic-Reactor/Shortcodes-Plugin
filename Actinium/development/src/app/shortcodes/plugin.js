@@ -1,6 +1,3 @@
-
-console.log('Shortcodes', '0.0.12');
-
 const path = require('path');
 
 const PLUGIN = {
@@ -10,7 +7,7 @@ const PLUGIN = {
     order: 100,
     version: {
         actinium: '>=3.2.6',
-        plugin: '0.0.2',
+        plugin: '0.0.21',
     },
     bundle: [],
     meta: {
@@ -50,10 +47,17 @@ Actinium.Plugin.addStylesheet(
  * Capability registration
  * ----------------------------------------------------------------------------
  */
-Actinium.Capability.register('shortcodes.create', {}, 1000);
-Actinium.Capability.register('shortcodes.retrieve', {}, 1000);
-Actinium.Capability.register('shortcodes.update', {}, 1000);
-Actinium.Capability.register('shortcodes.delete', {}, 1000);
+Actinium.Hook.register('before-capability-load', () => {
+    if (!Actinium.Plugin.isActive(PLUGIN.ID)) return;
+    const allowed = ['contributor', 'moderator'];
+    Actinium.Capability.register('shortcodes.create', { allowed });
+    Actinium.Capability.register('shortcodes.retrieve', { allowed });
+    Actinium.Capability.register('shortcodes.update', { allowed });
+    Actinium.Capability.register('shortcodes.delete', { allowed });
+    Actinium.Capability.register('setting.shortcodes-get', { allowed });
+    Actinium.Capability.register('setting.shortcodes-set', { allowed });
+    Actinium.Capability.register('setting.shortcodes-delete', { allowed });
+});
 
 /**
  * ----------------------------------------------------------------------------
@@ -65,21 +69,27 @@ Actinium.Capability.register('shortcodes.delete', {}, 1000);
 Actinium.Hook.register('start', () => {
     if (!Actinium.Plugin.isActive(PLUGIN.ID)) return;
     const PLUGIN_BLUEPRINTS = require('./blueprints');
-    PLUGIN_BLUEPRINTS.forEach(blueprint => Actinium.Blueprint.register(blueprint.ID, blueprint));
+    PLUGIN_BLUEPRINTS.forEach(blueprint =>
+        Actinium.Blueprint.register(blueprint.ID, blueprint),
+    );
 });
 
 // Activate: Blueprints
 Actinium.Hook.register('activate', ({ ID }) => {
     if (ID !== PLUGIN.ID) return;
     const PLUGIN_BLUEPRINTS = require('./blueprints');
-    PLUGIN_BLUEPRINTS.forEach(blueprint => Actinium.Blueprint.register(blueprint.ID, blueprint));
+    PLUGIN_BLUEPRINTS.forEach(blueprint =>
+        Actinium.Blueprint.register(blueprint.ID, blueprint),
+    );
 });
 
 // Deactivate: Blueprints
 Actinium.Hook.register('dectivate', ({ ID }) => {
     if (ID !== PLUGIN.ID) return;
     const PLUGIN_BLUEPRINTS = require('./blueprints');
-    PLUGIN_BLUEPRINTS.forEach(blueprint => Actinium.Blueprint.unregister(blueprint.ID));
+    PLUGIN_BLUEPRINTS.forEach(blueprint =>
+        Actinium.Blueprint.unregister(blueprint.ID),
+    );
 });
 
 // Routes

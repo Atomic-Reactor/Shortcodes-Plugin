@@ -3,27 +3,27 @@ module.exports = [
         blueprint: 'taxonomy-blueprint',
         route: '/admin/taxonomy/:type/:slug',
         meta: {
-            admin: true,
             builtIn: true,
+            app: 'admin',
         },
-        capabilities: [],
+        capabilities: ['taxonomy.update'],
     },
     {
         blueprint: 'taxonomy-blueprint',
         route: '/admin/taxonomy/:type',
         meta: {
-            admin: true,
             builtIn: true,
+            app: 'admin',
         },
-        capabilities: [],
+        capabilities: ['taxonomy.update'],
     },
     {
         blueprint: 'taxonomy-blueprint',
         route: '/admin/taxonomy',
         meta: {
-            admin: true,
             builtIn: true,
+            app: 'admin',
         },
-        capabilities: [],
+        capabilities: ['taxonomy.update'],
     },
 ];
