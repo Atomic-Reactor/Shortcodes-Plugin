@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const globby = require('globby');
 const webpack = require('webpack');
 const FilterWarningsPlugin = require('webpack-filter-warnings-plugin');
 const CompressionPlugin = require('compression-webpack-plugin');
@@ -12,6 +13,13 @@ let defines = {};
 if (fs.existsSync(`${rootPath}/src/app/server/defines.js`)) {
     defines = require(`${rootPath}/src/app/server/defines.js`);
 }
+
+const overrides = config => {
+    globby
+        .sync('./**/webpack.override.js')
+        .forEach(file => require(path.resolve(file))(config));
+    return config;
+};
 
 module.exports = config => {
     let plugins = [];
@@ -41,11 +49,6 @@ module.exports = config => {
     }
 
     plugins.push(new webpack.DefinePlugin(config.defines));
-    plugins.push(
-        new webpack.ContextReplacementPlugin(/^toolkit/, context => {
-            context.request = path.resolve('./src/app/toolkit');
-        }),
-    );
     plugins.push(
         new webpack.ContextReplacementPlugin(
             /^components\/common-ui/,
@@ -148,11 +151,13 @@ module.exports = config => {
                         /\.core\/manifest/,
                         /\.core\/index.js/,
                         /\.core\/gulp/,
-                        /\.core\/.*?config/,
+                        /\.core\/reactium-config.js$/,
+                        /\.core\/.*?\.config/,
                         /\.core\/.cli\//,
                         /\.cli/,
                         /src\/app\/server/,
                         /arcli-install.js$/,
+                        /arcli-publish.js$/,
                         /reactium-boot.js$/,
                     ],
                     use: [
@@ -165,10 +170,5 @@ module.exports = config => {
         },
     };
 
-    let webPackOverride = _ => _;
-    if (fs.existsSync(`${rootPath}/webpack.override.js`)) {
-        webPackOverride = require(`${rootPath}/webpack.override.js`);
-    }
-
-    return webPackOverride(defaultConfig);
+    return overrides(defaultConfig);
 };
