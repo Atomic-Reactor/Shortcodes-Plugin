@@ -182,3 +182,27 @@
         }
     }
 }
+
+.rte-shortcode {
+    display: inline-flex;
+    align-items: center;
+
+    .delete-btn {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        margin-left: 8px;
+        display: none;
+
+        svg {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    &:hover {
+        .delete-btn {
+            display: block;
+        }
+    }
+}

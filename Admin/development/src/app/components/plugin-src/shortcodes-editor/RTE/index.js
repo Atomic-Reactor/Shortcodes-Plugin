@@ -28,11 +28,7 @@ const FormatElement = ({ shortcode, ...props }) => {
     }
 
     if (!EditorComponent) {
-        EditorComponent = props => (
-            <span>
-                <span {...props} contentEditable={false} />
-            </span>
-        );
+        EditorComponent = props => <span {...props} />;
     }
 
     return <EditorComponent {...props} />;
@@ -49,6 +45,7 @@ Plugin.callback = editor => {
         let { x, y, width } = btn.getBoundingClientRect();
 
         x += width;
+        y = Math.floor(window.innerHeight / 4);
 
         editor.panel
             .setID(Plugin.type)

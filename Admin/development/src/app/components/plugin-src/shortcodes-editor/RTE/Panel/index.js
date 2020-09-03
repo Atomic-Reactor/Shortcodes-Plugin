@@ -75,14 +75,12 @@ let Panel = ({ editor, namespace, title, ...props }) => {
     };
 
     const insertNode = shortcode => {
-        const children = [{ text: shortcode.code }];
         const node = {
             id: uuid(),
-            children,
+            children: [{ text: shortcode.code }],
             shortcode,
             type: 'shortcode',
         };
-
         Transforms.insertNodes(editor, node, { at: state.selection });
     };
 

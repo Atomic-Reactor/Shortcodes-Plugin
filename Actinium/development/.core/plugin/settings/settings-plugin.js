@@ -47,6 +47,307 @@ const PLUGIN = {
 
 const COLLECTION = 'Setting';
 
+/**
+ * @api {Cloud} settings settings
+ * @apiVersion 3.1.1
+ * @apiGroup Cloud
+ * @apiName settings
+ * @apiDescription Retrieves the list of settings. Capabilities will be enforced.
+ * @apiPermission `Setting.retrieve` or individual `setting.${key}-get` permissions.
+ * @apiExample Example Usage:
+Actinium.Cloud.run('settings');
+ */
+const list = async req => {
+    let skip = 0;
+    const output = {};
+    const limit = 1000;
+    const qry = new Actinium.Query(COLLECTION).skip(skip).limit(limit);
+
+    let results = await qry.find({ useMasterKey: true });
+
+    const fullAccess = CloudHasCapabilities(req, `${COLLECTION}.retrieve`);
+    while (results.length > 0) {
+        results.forEach(item => {
+            const { key, value } = item.toJSON();
+            if (
+                key &&
+                (fullAccess || CloudHasCapabilities(req, `setting.${key}-get`))
+            ) {
+                output[key] = op.get(value, 'value');
+            }
+        });
+
+        skip += limit;
+        qry.skip(skip);
+        // result-set filtered by capability
+        results = await qry.find({ useMasterKey: true });
+    }
+
+    Actinium.Cache.set('setting', output, Actinium.Enums.cache.dataLoading);
+
+    return Promise.resolve(output);
+};
+
+/**
+ * @api {Cloud} setting-set setting-set
+ * @apiVersion 3.1.1
+ * @apiGroup Cloud
+ * @apiName setting-set
+ * @apiDescription Create or update a setting object. Capabilities will be enforced.
+ * @apiParam {String} key The unique setting key.
+ * @apiParam {Mixed} value The setting value.
+ * @apiParam {Boolean} [permissions] List of permissions to be applied to the setting.
+ * @apiPermission `Setting.create`, `Setting.update` or `setting.${key}-set` capabilities.
+ * @apiExample Example Usage:
+Actinium.Cloud.run('setting-set', { key: 'site', value: {title: 'My Site', hostname: 'mysite.com'}, public: true});
+ */
+const set = async req => {
+    const { params = {} } = req;
+    const { key = '', value, public: publicSetting = false } = params;
+    const [group, ...settingPath] = key.split('.');
+    if (!group) return;
+
+    const strict = false;
+
+    // permission to create new or update this setting
+    if (
+        !CloudHasCapabilities(
+            req,
+            [
+                `${COLLECTION}.create`,
+                `${COLLECTION}.update`,
+                `setting.${group}-set`,
+            ],
+            strict,
+        )
+    )
+        return Promise.reject('Permission denied.');
+
+    if (!isValid(value)) {
+        return Promise.reject('invalid setting type: ' + typeof value);
+    }
+
+    const masterOptions = Actinium.Utils.MasterOptions();
+
+    Actinium.Cache.del(`setting.${group}`);
+
+    let obj = await new Actinium.Query(COLLECTION)
+        .equalTo('key', group)
+        .first(masterOptions);
+    obj = obj || new Actinium.Object(COLLECTION);
+
+    let objValue;
+    if (settingPath.length) {
+        objValue = op.get(obj.get('value'), 'value', {});
+        op.set(objValue, settingPath, value);
+    } else {
+        objValue = value;
+    }
+
+    obj.set('key', group);
+    obj.set('value', { value: objValue });
+
+    const permissions = op.get(params, 'permissions', [
+        {
+            permission: 'read',
+            type: 'public',
+            allow: false,
+        },
+        {
+            permission: 'write',
+            type: 'public',
+            allow: false,
+        },
+    ]);
+
+    const groupACL = await Actinium.Utils.CloudACL(
+        permissions,
+        `setting.${group}-get`, // read
+        `setting.${group}-set`, // write
+        obj.getACL(),
+    );
+
+    obj.setACL(groupACL);
+
+    const setting = await obj.save(null, masterOptions);
+
+    Actinium.Cache.set(
+        `setting.${key}`,
+        objValue,
+        Actinium.Enums.cache.dataLoading,
+    );
+
+    const result = op.get(setting.get('value'), 'value');
+    if (settingPath.length) {
+        return op.get(result, settingPath);
+    }
+
+    return result;
+};
+
+/**
+ * @api {Cloud} setting-unset setting-unset
+ * @apiVersion 3.1.1
+ * @apiGroup Cloud
+ * @apiName setting-unset
+ * @apiDescription Unsets a setting value. Capabilities will be enforced.
+ * @apiParam {String} key The unique setting key.
+ * @apiPermission `Setting.delete` or `setting.${key}-delete` capabilities.
+ * @apiExample Example Usage:
+Actinium.Cloud.run('setting-unset', { key: 'site' });
+ */
+const del = async req => {
+    const { key = '' } = req.params;
+    const [group, ...settingPath] = key.split('.');
+
+    // delete only for top-level groups, otherwise set
+    if (settingPath.length) {
+        op.del(req, 'params.value');
+        return set(req);
+    }
+
+    const strict = false;
+
+    // permission to create new or update this setting
+    if (
+        !CloudHasCapabilities(
+            req,
+            [`${COLLECTION}.delete`, `setting.${group}-delete`],
+            strict,
+        )
+    )
+        return Promise.reject('Permission denied.');
+
+    const opts = CloudCapOptions(
+        req,
+        [`${COLLECTION}.delete`, `setting.${group}-delete`],
+        strict,
+    );
+
+    let obj = await new Actinium.Query(COLLECTION)
+        .equalTo('key', group)
+        .first(opts);
+
+    return obj ? obj.destroy(opts) : Promise.resolve();
+};
+
+/**
+ * @api {Cloud} setting-get setting-get
+ * @apiVersion 3.1.1
+ * @apiGroup Cloud
+ * @apiName setting-get
+ * @apiDescription Retrieves a specifc setting object. Capabilities will be enforced.
+ * @apiParam {String} key The unique setting key.
+ * @apiPermission `Setting.retrieve` or `setting.${key}-get` capabilities.
+ * @apiExample Example Usage:
+Actinium.Cloud.run('setting-get', { key: 'site'});
+ */
+const get = async req => {
+    const { key = '' } = req.params;
+    const [group, ...settingPath] = key.split('.');
+    if (!group) return;
+
+    const strict = false;
+
+    if (
+        !CloudHasCapabilities(
+            req,
+            [`${COLLECTION}.retrieve`, `setting.${group}-get`],
+            false,
+        )
+    )
+        return Promise.reject('Permission denied.');
+
+    const cached = Actinium.Cache.get(`setting.${key}`);
+
+    if (typeof cached !== 'undefined') {
+        return cached;
+    }
+
+    let obj = await new Actinium.Query(COLLECTION)
+        .equalTo('key', group)
+        .first(
+            CloudCapOptions(
+                req,
+                [`${COLLECTION}.retrieve`, `setting.${group}-get`],
+                false,
+            ),
+        );
+    obj = obj ? obj.toJSON() : {};
+
+    const result = op.get(obj, 'value.value');
+    if (settingPath.length) return op.get(result, settingPath);
+
+    Actinium.Cache.set(
+        `setting.${key}`,
+        result,
+        Actinium.Enums.cache.dataLoading,
+    );
+
+    return result;
+};
+
+const isValid = value => {
+    const checks = [
+        'isEmpty',
+        'isBoolean',
+        'isNumber',
+        'isString',
+        'isDate',
+        'isArray',
+        'isObject',
+    ];
+
+    return checks.reduce((status, func) => _[func](value) || status, false);
+};
+
+const afterSave = req => {
+    const { key, value } = req.object.toJSON();
+    Actinium.Cache.set(`setting.${key}`, op.get(value, 'value'));
+};
+
+const afterDel = req => {
+    const { key = '' } = req.object.toJSON();
+
+    Actinium.Cache.del(`setting.${key}`);
+    Actinium.Capability.unregister(`setting.${key}-set`);
+    Actinium.Capability.unregister(`setting.${key}-get`);
+    Actinium.Capability.unregister(`setting.${key}-delete`);
+    Actinium.Hook.run('setting-unset', key);
+};
+
+const beforeSave = async req => {
+    const { key, value } = req.object.toJSON();
+
+    if (req.original) {
+        const { value: previous } = req.original.toJSON();
+
+        if (!_.isEqual(previous, value)) {
+            Actinium.Hook.run('setting-change', key, value, previous);
+        }
+    }
+
+    Actinium.Cache.set(`setting.${key}`, op.get(value, 'value'));
+    Actinium.Hook.run('setting-set', key, value);
+};
+
+const registerBlueprints = (reg = true) => ({ ID }) => {
+    if (ID && ID !== PLUGIN.ID) return;
+    const PLUGIN_BLUEPRINTS = require('./blueprints');
+    if (reg === true)
+        PLUGIN_BLUEPRINTS.forEach(bp => Actinium.Blueprint.register(bp.ID, bp));
+    else PLUGIN_BLUEPRINTS.forEach(bp => Actinium.Blueprint.unregister(bp.ID));
+};
+
+const saveRoutes = async () => {
+    const PLUGIN_ROUTES = require('./routes');
+    for (const route of PLUGIN_ROUTES) {
+        await Actinium.Route.save(route);
+    }
+};
+
+Actinium.Plugin.register(PLUGIN, true);
+
 Actinium.Capability.register(
     `${COLLECTION}.create`,
     {},
@@ -112,40 +413,35 @@ Actinium.Hook.register(
     Actinium.Enums.priority.highest,
 );
 
-const PLUGIN_BLUEPRINTS = require('./blueprints');
-const registerBlueprints = (reg = true) => ({ ID }) => {
-    if (ID && ID !== PLUGIN.ID) return;
-    if (reg === true)
-        PLUGIN_BLUEPRINTS.forEach(bp => Actinium.Blueprint.register(bp.ID, bp));
-    else PLUGIN_BLUEPRINTS.forEach(bp => Actinium.Blueprint.unregister(bp.ID));
-};
-
 // Start: Blueprints
 Actinium.Hook.register('start', registerBlueprints(true));
 
-// Activate: Blueprints
+// Activate: Blueprints - Update blueprints on plugin activation
 Actinium.Hook.register('activate', registerBlueprints(true));
 
-// Deactivate: Blueprints
-Actinium.Hook.register('deactivate', registerBlueprints(false));
-
-const PLUGIN_ROUTES = require('./routes');
-const saveRoutes = async () => {
-    for (const route of PLUGIN_ROUTES) {
-        await Actinium.Route.save(route);
-    }
-};
-
-// Update routes on startup
-Actinium.Hook.register('start', async () => {
-    if (Actinium.Plugin.isActive(PLUGIN.ID)) {
+// Active: Routes - Update routes on plugin activation
+Actinium.Hook.register('activate', async ({ ID }) => {
+    if (ID === PLUGIN.ID) {
         await saveRoutes();
     }
 });
 
-// Update routes on plugin activation
-Actinium.Hook.register('activate', async ({ ID }) => {
+// Deactivate: Blueprints
+Actinium.Hook.register('deactivate', registerBlueprints(false));
+
+// Deactivate: Routes - Remove routes on deactivation
+Actinium.Hook.register('deactivate', async ({ ID }) => {
     if (ID === PLUGIN.ID) {
+        const PLUGIN_ROUTES = require('./routes');
+        for (const route of PLUGIN_ROUTES) {
+            await Actinium.Route.delete(route);
+        }
+    }
+});
+
+// Update routes on startup
+Actinium.Hook.register('start', async () => {
+    if (Actinium.Plugin.isActive(PLUGIN.ID)) {
         await saveRoutes();
     }
 });
@@ -157,346 +453,7 @@ Actinium.Hook.register('update', async ({ ID }) => {
     }
 });
 
-// Remove routes on deactivation
-Actinium.Hook.register('deactivate', async ({ ID }) => {
-    if (ID === PLUGIN.ID) {
-        for (const route of PLUGIN_ROUTES) {
-            await Actinium.Route.delete(route);
-        }
-    }
-});
-
-/**
- * @api {Cloud} settings settings
- * @apiVersion 3.1.1
- * @apiGroup Cloud
- * @apiName settings
- * @apiDescription Retrieves the list of settings. Capabilities will be enforced.
- * @apiPermission `Setting.retrieve` or individual `setting.${key}-get` permissions.
- * @apiExample Example Usage:
-Actinium.Cloud.run('settings');
- */
-const list = async req => {
-    let skip = 0;
-    const output = {};
-    const limit = 1000;
-    const qry = new Parse.Query(COLLECTION).skip(skip).limit(limit);
-
-    let results = await qry.find({ useMasterKey: true });
-
-    const fullAccess = CloudHasCapabilities(req, `${COLLECTION}.retrieve`);
-    while (results.length > 0) {
-        results.forEach(item => {
-            const { key, value } = item.toJSON();
-            if (
-                key &&
-                (fullAccess || CloudHasCapabilities(req, `setting.${key}-get`))
-            ) {
-                output[key] = op.get(value, 'value');
-            }
-        });
-
-        skip += limit;
-        qry.skip(skip);
-        // result-set filtered by capability
-        results = await qry.find({ useMasterKey: true });
-    }
-
-    Actinium.Cache.set('setting', output, Actinium.Enums.cache.dataLoading);
-
-    return Promise.resolve(output);
-};
-
-/**
- * @api {Cloud} setting-set setting-set
- * @apiVersion 3.1.1
- * @apiGroup Cloud
- * @apiName setting-set
- * @apiDescription Create or update a setting object. Capabilities will be enforced.
- * @apiParam {String} key The unique setting key.
- * @apiParam {Mixed} value The setting value.
- * @apiParam {Boolean} [public] When true, the setting will be made publicly readable, otherwise reads will be restricted.
- * @apiPermission `Setting.create`, `Setting.update` or `setting.${key}-set` capabilities.
- * @apiExample Example Usage:
-Actinium.Cloud.run('setting-set', { key: 'site', value: {title: 'My Site', hostname: 'mysite.com'}, public: true});
- */
-const set = async req => {
-    const { key = '', value, public: publicSetting = false } = req.params;
-    const [group, ...settingPath] = key.split('.');
-    if (!group) return;
-
-    const strict = false;
-
-    // permission to create new or update this setting
-    if (
-        !CloudHasCapabilities(
-            req,
-            [
-                `${COLLECTION}.create`,
-                `${COLLECTION}.update`,
-                `setting.${group}-set`,
-            ],
-            strict,
-        )
-    )
-        return Promise.reject('Permission denied.');
-
-    if (!isValid(value)) {
-        return Promise.reject('invalid setting type: ' + typeof value);
-    }
-
-    const opts = CloudCapOptions(
-        req,
-        [`${COLLECTION}.create`, `${COLLECTION}.update`, `setting.${key}-set`],
-        strict,
-    );
-
-    Actinium.Cache.del(`setting.${group}`);
-
-    let obj = await new Parse.Query(COLLECTION)
-        .equalTo('key', group)
-        .first(opts);
-    obj = obj || new Parse.Object(COLLECTION);
-
-    let objValue;
-    if (settingPath.length) {
-        objValue = op.get(obj.get('value'), 'value', {});
-        op.set(objValue, settingPath, value);
-    } else {
-        objValue = value;
-    }
-
-    obj.set('key', group);
-    obj.set('value', { value: objValue });
-
-    const setting = await obj.save(null, opts);
-
-    Actinium.Cache.set(
-        `setting.${key}`,
-        objValue,
-        Actinium.Enums.cache.dataLoading,
-    );
-
-    // Make setting publicly readable
-    if (publicSetting) {
-        await Actinium.Cloud.run(
-            'capability-edit',
-            {
-                capability: `setting.${group}-get`,
-                perms: {
-                    allowed: ['anonymous'],
-                },
-            },
-            CloudRunOptions(req),
-        );
-        // Remove public read
-    } else {
-        const { allowed = [] } = await Actinium.Cloud.run(
-            'capability-get',
-            {
-                capability: `setting.${group}-get`,
-            },
-            CloudRunOptions(req),
-        );
-        await Actinium.Cloud.run(
-            'capability-edit',
-            {
-                capability: `setting.${group}-get`,
-                perms: {
-                    allowed: allowed.filter(role => role !== 'anonymous'),
-                },
-            },
-            CloudRunOptions(req),
-        );
-    }
-
-    const result = op.get(setting.get('value'), 'value');
-    if (settingPath.length) {
-        return op.get(result, settingPath);
-    }
-
-    return result;
-};
-
-/**
- * @api {Cloud} setting-unset setting-unset
- * @apiVersion 3.1.1
- * @apiGroup Cloud
- * @apiName setting-unset
- * @apiDescription Unsets a setting value. Capabilities will be enforced.
- * @apiParam {String} key The unique setting key.
- * @apiPermission `Setting.delete` or `setting.${key}-delete` capabilities.
- * @apiExample Example Usage:
-Actinium.Cloud.run('setting-unset', { key: 'site' });
- */
-const del = async req => {
-    const { key = '' } = req.params;
-    const [group, ...settingPath] = key.split('.');
-
-    // delete only for top-level groups, otherwise set
-    if (settingPath.length) {
-        op.del(req, 'params.value');
-        return set(req);
-    }
-
-    const strict = false;
-
-    // permission to create new or update this setting
-    if (
-        !CloudHasCapabilities(
-            req,
-            [`${COLLECTION}.delete`, `setting.${group}-delete`],
-            strict,
-        )
-    )
-        return Promise.reject('Permission denied.');
-
-    const opts = CloudCapOptions(
-        req,
-        [`${COLLECTION}.delete`, `setting.${group}-delete`],
-        strict,
-    );
-
-    let obj = await new Parse.Query(COLLECTION)
-        .equalTo('key', group)
-        .first(opts);
-
-    return obj ? obj.destroy(opts) : Promise.resolve();
-};
-
-/**
- * @api {Cloud} setting-get setting-get
- * @apiVersion 3.1.1
- * @apiGroup Cloud
- * @apiName setting-get
- * @apiDescription Retrieves a specifc setting object. Capabilities will be enforced.
- * @apiParam {String} key The unique setting key.
- * @apiPermission `Setting.retrieve` or `setting.${key}-get` capabilities.
- * @apiExample Example Usage:
-Actinium.Cloud.run('setting-get', { key: 'site'});
- */
-const get = async req => {
-    const { key = '' } = req.params;
-    const [group, ...settingPath] = key.split('.');
-    if (!group) return;
-
-    const strict = false;
-
-    if (
-        !CloudHasCapabilities(
-            req,
-            [`${COLLECTION}.retrieve`, `setting.${group}-get`],
-            false,
-        )
-    )
-        return Promise.reject('Permission denied.');
-
-    const cached = Actinium.Cache.get(`setting.${key}`);
-
-    if (typeof cached !== 'undefined') {
-        return cached;
-    }
-
-    let obj = await new Parse.Query(COLLECTION)
-        .equalTo('key', group)
-        .first(
-            CloudCapOptions(
-                req,
-                [`${COLLECTION}.retrieve`, `setting.${group}-get`],
-                false,
-            ),
-        );
-    obj = obj ? obj.toJSON() : {};
-
-    const result = op.get(obj, 'value.value');
-    if (settingPath.length) return op.get(result, settingPath);
-
-    Actinium.Cache.set(
-        `setting.${key}`,
-        result,
-        Actinium.Enums.cache.dataLoading,
-    );
-
-    return result;
-};
-
-const isValid = value => {
-    const checks = [
-        'isEmpty',
-        'isBoolean',
-        'isNumber',
-        'isString',
-        'isDate',
-        'isArray',
-        'isObject',
-    ];
-
-    return checks.reduce((status, func) => _[func](value) || status, false);
-};
-
-const beforeSave = async req => {
-    const { key: group, value } = req.object.toJSON();
-
-    const old = await new Parse.Query(COLLECTION)
-        .equalTo('key', group)
-        .first(CloudRunOptions(req));
-
-    Actinium.Cache.set(`setting.${group}`, op.get(value, 'value'));
-
-    // lock down all settings, and enforce by capability
-    const acl = await settingsACL();
-    req.object.setACL(acl);
-
-    if (old) {
-        const { value: previous } = old.toJSON();
-
-        if (!_.isEqual(previous, value)) {
-            Actinium.Hook.run('setting-change', group, value, previous);
-        }
-    }
-
-    Actinium.Hook.run('setting-set', group, value);
-};
-
-const settingsACL = async () => {
-    const acl = new Parse.ACL();
-    const { roles = [] } = await Actinium.Hook.run('settings-acl-roles');
-
-    acl.setPublicReadAccess(false);
-    acl.setPublicWriteAccess(false);
-
-    roles.forEach(role => {
-        acl.setRoleReadAccess(role, true);
-        acl.setRoleWriteAccess(role, true);
-    });
-
-    await Actinium.Hook.run('settings-acl', acl);
-    return acl;
-};
-
-const afterDel = req => {
-    const { key = '' } = req.object.toJSON();
-
-    Actinium.Capability.unregister(`setting.${key}-set`);
-    Actinium.Capability.unregister(`setting.${key}-get`);
-    Actinium.Capability.unregister(`setting.${key}-delete`);
-    Actinium.Cache.del(`setting.${key}`);
-    Actinium.Hook.run('setting-unset', key);
-};
-
-Actinium.Plugin.register(PLUGIN, true);
-
-Actinium.Cloud.define(PLUGIN.ID, 'settings', list);
-Actinium.Cloud.define(PLUGIN.ID, 'setting-get', get);
-Actinium.Cloud.define(PLUGIN.ID, 'setting-set', set);
-Actinium.Cloud.define(PLUGIN.ID, 'setting-save', set);
-Actinium.Cloud.define(PLUGIN.ID, 'setting-unset', del);
-Actinium.Cloud.define(PLUGIN.ID, 'setting-del', del);
-Actinium.Cloud.define(PLUGIN.ID, 'setting-rm', del);
-
-Actinium.Cloud.beforeSave(COLLECTION, beforeSave);
-Actinium.Cloud.afterDelete(COLLECTION, afterDel);
-
+// Running hook
 Actinium.Hook.register('running', async () => {
     Actinium.Pulse.define(
         'settings-sync',
@@ -510,3 +467,15 @@ Actinium.Hook.register('running', async () => {
         },
     );
 });
+
+Actinium.Cloud.define(PLUGIN.ID, 'settings', list);
+Actinium.Cloud.define(PLUGIN.ID, 'setting-get', get);
+Actinium.Cloud.define(PLUGIN.ID, 'setting-set', set);
+Actinium.Cloud.define(PLUGIN.ID, 'setting-save', set);
+Actinium.Cloud.define(PLUGIN.ID, 'setting-unset', del);
+Actinium.Cloud.define(PLUGIN.ID, 'setting-del', del);
+Actinium.Cloud.define(PLUGIN.ID, 'setting-rm', del);
+
+Actinium.Cloud.afterDelete(COLLECTION, afterDel);
+Actinium.Cloud.afterSave(COLLECTION, afterSave);
+Actinium.Cloud.beforeSave(COLLECTION, beforeSave);

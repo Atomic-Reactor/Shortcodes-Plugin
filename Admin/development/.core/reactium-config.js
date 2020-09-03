@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const globby = require('globby');
 const rootPath = path.resolve(__dirname, '..');
 const gulpConfig = require('./gulp.config');
 
-const version = '3.3.3';
+const version = '3.4.5';
 
 const contextMode = () => {
     if (
@@ -156,7 +157,7 @@ const defaultManifestConfig = {
     sourceMappings: [
         {
             from: 'src/app/',
-            to: '',
+            to: '../src/app/',
         },
         {
             from: '.core/',
@@ -180,11 +181,6 @@ const defaultManifestConfig = {
         },
         common: {
             modulePath: 'components/common-ui/',
-            filePattern: '.js?$',
-            mode: contextMode(),
-        },
-        toolkit: {
-            modulePath: 'toolkit',
             filePattern: '.js?$',
             mode: contextMode(),
         },
@@ -223,22 +219,19 @@ const defaultManifestConfig = {
         ],
         searchParams: {
             extensions: /\.(js|json)$/,
-            exclude: [
-                /.ds_store/i,
-                /.core/i,
-                /.cli\//i,
-                /src\/assets/,
-                /src\/app\/toolkit/,
-            ],
+            exclude: [/.ds_store/i, /.core/i, /.cli\//i, /src\/assets/],
         },
     },
 };
 
-let manifestConfigOverride = _ => _;
-if (fs.existsSync(`${rootPath}/manifest.config.override.js`)) {
-    manifestConfigOverride = require(`${rootPath}/manifest.config.override.js`);
-}
-const manifestConfig = manifestConfigOverride(defaultManifestConfig);
+const overrides = config => {
+    globby
+        .sync('./**/manifest.config.override.js')
+        .forEach(file => require(path.resolve(file))(config));
+    return config;
+};
+
+const manifestConfig = overrides(defaultManifestConfig);
 
 /**
  * Use liberally for additional core configuration.
@@ -385,6 +378,30 @@ module.exports = {
                     version: '>=3.2.2',
                     destination: '/.huskyrc',
                     source: '/tmp/update/.huskyrc',
+                },
+                {
+                    overwrite: false,
+                    version: '>=3.4.2',
+                    destination: '/src/app/api/reactium-hooks.js',
+                    source: '/tmp/update/src/app/api/reactium-hooks.js',
+                },
+                {
+                    overwrite: false,
+                    version: '>=3.4.2',
+                    destination: '/src/app/api/index.js',
+                    source: '/tmp/update/src/app/api/index.js',
+                },
+                {
+                    overwrite: false,
+                    version: '>=3.4.2',
+                    destination: '/src/app/api/domain.js',
+                    source: '/tmp/update/src/app/api/domain.js',
+                },
+                {
+                    overwrite: false,
+                    version: '>=3.4.2',
+                    destination: '/.npmrc',
+                    source: '/tmp/update/.npmrc',
                 },
             ],
             remove: [],
